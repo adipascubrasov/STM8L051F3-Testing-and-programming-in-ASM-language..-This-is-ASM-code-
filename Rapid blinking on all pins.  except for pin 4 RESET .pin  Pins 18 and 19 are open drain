@@ -1,0 +1,108 @@
+stm8/
+
+; STM8L051F3 - CONFIGURARE SI DETECTIE PINI COMPLETA
+    segment 'rom'
+
+; Definire adrese registre exacte
+FLASH_PUKR  equ $5052
+CLK_CKDIVR  equ $50C6
+CLK_PCKENR1 equ $50C3
+CLK_PCKENR2 equ $50C4
+
+; Registre GPIO Port A
+PA_ODR      equ $5000
+PA_DDR      equ $5002
+PA_CR1      equ $5003
+
+; Registre GPIO Port B
+PB_ODR      equ $5005
+PB_DDR      equ $5007
+PB_CR1      equ $5008
+
+; Registre GPIO Port C
+PC_ODR      equ $500A
+PC_DDR      equ $500C
+PC_CR1      equ $500D
+
+; Registre GPIO Port D
+PD_ODR      equ $500F
+PD_DDR      equ $5011
+PD_CR1      equ $5012
+
+INIT:   
+        ; 1. Deblocare Flash hardware
+        ld a,#$56
+        ld FLASH_PUKR,a
+        ld a,#$AE
+        ld FLASH_PUKR,a
+
+        ; 2. Configurare Ceas Master direct (16MHz, fara divizare)
+        ld a,#$00
+        ld CLK_CKDIVR,a     
+
+        ; 3. Activare ceas periferice pentru toate porturile IO
+        ld a,#$FF           
+        ld CLK_PCKENR1,a    
+        ld a,#$FF           
+        ld CLK_PCKENR2,a    
+
+        ; 4. Port A: Masca $FD (1111 1101) -> Protejam bitul 1 (PA1/SWIM)
+        ld a,#$FD       
+        ld PA_DDR,a     
+        ld PA_CR1,a     
+
+        ; 5. Port B: Masca $FF -> Activam TOTI pinii ca iesire (Inclusiv PB5!)
+        ld a,#$FF       
+        ld PB_DDR,a     
+        ld PB_CR1,a     
+
+        ; 6. Port C: Masca $FF -> Activam pinii reali existenti (PC5, PC6)
+        ld a,#$FF       
+        ld PC_DDR,a     
+        ld PC_CR1,a     
+
+        ; 7. Port D: Masca $FF -> Toate iesirile active
+        ld a,#$FF       
+        ld PD_DDR,a     
+        ld PD_CR1,a     
+
+MAIN:   
+        ; --- TO?I PINII DISPONIBILI TREC ÎN 1 LOGIC ---
+        ld a,#$FD       ; Portul A HIGH (fara PA1/SWIM)
+        ld PA_ODR,a     
+        ld a,#$FF       ; Portul B HIGH (Toate liniile, inclusiv PB5)
+        ld PB_ODR,a     
+        ld a,#$FF       ; Portul C HIGH (Liniile reale PC5, PC6)
+        ld PC_ODR,a     
+        ld a,#$FF       ; Portul D HIGH
+        ld PD_ODR,a     
+        
+        call DELAY_100MS
+        
+        ; --- TO?I PINII TREC ÎN 0 LOGIC ---
+        clr a           
+        ld PA_ODR,a     
+        ld PB_ODR,a     
+        ld PC_ODR,a     
+        ld PD_ODR,a     
+        
+        call DELAY_100MS
+        
+        jp MAIN         ; Reia bucla la infinit
+
+; Rutina de delay modificata la 100ms
+DELAY_100MS:  
+        ld a,#$02       ; S-a modificat de la $0A (10) la $02 (2) pentru 100ms
+L1:     ldw x,#$FFFF    
+L2:     decw x
+        jrne L2
+        dec a
+        jrne L1
+        ret
+
+    segment 'vectit'
+        dc.b $82, $00   ; Aliniere pe 4 octeti specifica seriei L
+        dc.w INIT
+    
+    end
+		
